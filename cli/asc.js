@@ -24,6 +24,7 @@ var assemblyscript, isDev;
     assemblyscript = require("../dist/assemblyscript.js");
     isDev = false;
   } catch (e) {
+    console.log(e)
     try {
       require("ts-node").register({
         project: path.join(__dirname, "..", "src", "tsconfig.json"),
@@ -428,6 +429,7 @@ exports.main = function main(argv, options, callback) {
   assemblyscript.setTarget(compilerOptions, 0);
   assemblyscript.setNoTreeShaking(compilerOptions, !!args.noTreeShaking);
   assemblyscript.setNoAssert(compilerOptions, !!args.noAssert);
+  assemblyscript.setSharedMemory(compilerOptions, !!args.sharedMemory);
   assemblyscript.setImportMemory(compilerOptions, !!args.importMemory);
   assemblyscript.setImportTable(compilerOptions, !!args.importTable);
   assemblyscript.setMemoryBase(compilerOptions, args.memoryBase >>> 0);

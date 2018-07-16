@@ -21,7 +21,7 @@ export enum NativeType {
   I32 = _BinaryenTypeInt32(),
   I64 = _BinaryenTypeInt64(),
   F32 = _BinaryenTypeFloat32(),
-  F64 =  _BinaryenTypeFloat64(),
+  F64 = _BinaryenTypeFloat64(),
   Unreachable = _BinaryenTypeUnreachable(),
   Auto = _BinaryenTypeAuto()
 }
@@ -799,13 +799,14 @@ export class Module {
   addMemoryImport(
     internalName: string,
     externalModuleName: string,
-    externalBaseName: string
+    externalBaseName: string,
+    shared: bool = false,
   ): ImportRef {
     var cStr1 = allocString(internalName);
     var cStr2 = allocString(externalModuleName);
     var cStr3 = allocString(externalBaseName);
     try {
-      return _BinaryenAddMemoryImport(this.ref, cStr1, cStr2, cStr3);
+      return _BinaryenAddMemoryImport(this.ref, cStr1, cStr2, cStr3, shared);
     } finally {
       free_memory(cStr3);
       free_memory(cStr2);
@@ -937,7 +938,7 @@ export class Module {
     if (!names) {
       let name = allocString("precompute");
       this.cachedPrecomputeName = name;
-      this.cachedPrecomputeNames = names = allocI32Array([ name ]);
+      this.cachedPrecomputeNames = names = allocI32Array([name]);
     }
     _BinaryenFunctionRunPasses(func, this.ref, names, 1);
   }
@@ -1002,9 +1003,9 @@ export class Module {
     maxDepth -= 1;
 
     var nested1: ExpressionRef,
-        nested2: ExpressionRef;
+      nested2: ExpressionRef;
 
-        switch (_BinaryenExpressionGetId(expr)) {
+    switch (_BinaryenExpressionGetId(expr)) {
       case ExpressionId.Const: {
         switch (_BinaryenExpressionGetType(expr)) {
           case NativeType.I32: {
@@ -1045,19 +1046,19 @@ export class Module {
         return (
           _BinaryenLoadIsAtomic(expr)
             ? _BinaryenAtomicLoad(this.ref,
-                _BinaryenLoadGetBytes(expr),
-                _BinaryenLoadGetOffset(expr),
-                _BinaryenExpressionGetType(expr),
-                nested1
-              )
+              _BinaryenLoadGetBytes(expr),
+              _BinaryenLoadGetOffset(expr),
+              _BinaryenExpressionGetType(expr),
+              nested1
+            )
             : _BinaryenLoad(this.ref,
-                _BinaryenLoadGetBytes(expr),
-                _BinaryenLoadIsSigned(expr) ? 1 : 0,
-                _BinaryenLoadGetOffset(expr),
-                _BinaryenLoadGetAlign(expr),
-                _BinaryenExpressionGetType(expr),
-                nested1
-              )
+              _BinaryenLoadGetBytes(expr),
+              _BinaryenLoadIsSigned(expr) ? 1 : 0,
+              _BinaryenLoadGetOffset(expr),
+              _BinaryenLoadGetAlign(expr),
+              _BinaryenExpressionGetType(expr),
+              nested1
+            )
         );
       }
       case ExpressionId.Unary: {
@@ -1317,7 +1318,7 @@ export class Relooper {
     return relooper;
   }
 
-  private constructor() {}
+  private constructor() { }
 
   addBlock(code: ExpressionRef): RelooperBlockRef {
     return _RelooperAddBlock(this.ref, code);
@@ -1405,10 +1406,10 @@ function allocI32Array(i32s: i32[] | null): usize {
   for (let i = 0, k = i32s.length; i < k; ++i) {
     let val = i32s[i];
     // store<i32>(idx, val) is not portable
-    store<u8>(idx    , ( val         & 0xff) as u8);
-    store<u8>(idx + 1, ((val >>   8) & 0xff) as u8);
-    store<u8>(idx + 2, ((val >>  16) & 0xff) as u8);
-    store<u8>(idx + 3, ( val >>> 24        ) as u8);
+    store<u8>(idx, (val & 0xff) as u8);
+    store<u8>(idx + 1, ((val >> 8) & 0xff) as u8);
+    store<u8>(idx + 2, ((val >> 16) & 0xff) as u8);
+    store<u8>(idx + 3, (val >>> 24) as u8);
     idx += 4;
   }
   return ptr;
@@ -1455,30 +1456,30 @@ function allocString(str: string | null): usize {
     if (u <= 0x7F) {
       store<u8>(idx++, u as u8);
     } else if (u <= 0x7FF) {
-      store<u8>(idx++, (0xC0 |  (u >>> 6)       ) as u8);
-      store<u8>(idx++, (0x80 | ( u         & 63)) as u8);
+      store<u8>(idx++, (0xC0 | (u >>> 6)) as u8);
+      store<u8>(idx++, (0x80 | (u & 63)) as u8);
     } else if (u <= 0xFFFF) {
-      store<u8>(idx++, (0xE0 |  (u >>> 12)      ) as u8);
-      store<u8>(idx++, (0x80 | ((u >>>  6) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ( u         & 63)) as u8);
+      store<u8>(idx++, (0xE0 | (u >>> 12)) as u8);
+      store<u8>(idx++, (0x80 | ((u >>> 6) & 63)) as u8);
+      store<u8>(idx++, (0x80 | (u & 63)) as u8);
     } else if (u <= 0x1FFFFF) {
-      store<u8>(idx++, (0xF0 |  (u >>> 18)      ) as u8);
+      store<u8>(idx++, (0xF0 | (u >>> 18)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 12) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ((u >>>  6) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ( u         & 63)) as u8);
+      store<u8>(idx++, (0x80 | ((u >>> 6) & 63)) as u8);
+      store<u8>(idx++, (0x80 | (u & 63)) as u8);
     } else if (u <= 0x3FFFFFF) {
-      store<u8>(idx++, (0xF8 |  (u >>> 24)      ) as u8);
+      store<u8>(idx++, (0xF8 | (u >>> 24)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 18) & 63)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 12) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ((u >>>  6) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ( u         & 63)) as u8);
+      store<u8>(idx++, (0x80 | ((u >>> 6) & 63)) as u8);
+      store<u8>(idx++, (0x80 | (u & 63)) as u8);
     } else {
-      store<u8>(idx++, (0xFC |  (u >>> 30)      ) as u8);
+      store<u8>(idx++, (0xFC | (u >>> 30)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 24) & 63)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 18) & 63)) as u8);
       store<u8>(idx++, (0x80 | ((u >>> 12) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ((u >>>  6) & 63)) as u8);
-      store<u8>(idx++, (0x80 | ( u         & 63)) as u8);
+      store<u8>(idx++, (0x80 | ((u >>> 6) & 63)) as u8);
+      store<u8>(idx++, (0x80 | (u & 63)) as u8);
     }
   }
   store<u8>(idx, 0);
@@ -1487,8 +1488,8 @@ function allocString(str: string | null): usize {
 
 function readInt(ptr: usize): i32 {
   return (
-     load<u8>(ptr    )        |
-    (load<u8>(ptr + 1) <<  8) |
+    load<u8>(ptr) |
+    (load<u8>(ptr + 1) << 8) |
     (load<u8>(ptr + 2) << 16) |
     (load<u8>(ptr + 3) << 24)
   );

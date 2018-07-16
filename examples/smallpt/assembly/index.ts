@@ -154,13 +154,6 @@ export class Vec {
         return c;
     }
 }
-// Vec operator - (const Vec & b) const { return Vec(x - b.x, y - b.y, z - b.z); }
-// Vec operator * (double b) const { return Vec(x * b, y * b, z * b); }
-// Vec mult(const Vec & b) const { return Vec(x * b.x, y * b.y, z * b.z); }
-// Vec & norm(){ return * this = * this * (1 / sqrt<float>(x * x + y * y + z * z)); }
-// double dot(const Vec & b) const { return x* b.x + y * b.y + z * b.z; } // cross:
-// Vec operator % (Vec & b){ return Vec(y * b.z - z * b.y, z * b.x - x * b.z, x * b.y - y * b.x); }
-//  };
 
 class Ray {
     constructor(public o: Vec = new Vec(), public d: Vec = new Vec()) {}
@@ -197,10 +190,10 @@ class Sphere {
         // returns distance, 0 if nohit
         // var op: Vec = <Vec>(this.p - r.o); // Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0
         var op: Vec = this.p.sub2(r.o, locals.loc17); // Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0
-        var t: float,
-            eps = 1e-4,
-            b = op.dot(r.d),
-            det = b * b - op.dot(op) + this.rad * this.rad;
+        var t: float;
+        var eps = 1e-4;
+        var b = op.dot(r.d);
+        var det = b * b - op.dot(op) + this.rad * this.rad;
         if (det < 0) {
             return 0;
         } else {
@@ -236,11 +229,11 @@ function intersect(r: Ray, hit: Hit, locals: Locals): Hit {
     var id: int = -1;
     var n: int = context.spheres.length;
     var d: float = 0;
-    var inf: float = (t = 1e20);
-
-    for (let i = n; i--; ) {
+    // var inf: float = (t = 1e20);
+    for (let i = 0; i < n; i++) {
         d = context.spheres[i].intersect(r, locals);
         if (d && d < t) {
+            t = d;
             id = i;
         }
     }
@@ -251,14 +244,115 @@ function intersect(r: Ray, hit: Hit, locals: Locals): Hit {
     return hit;
 }
 
-function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
+class Context {
+    pixels: Vec[];
+    dir: Vec;
+    pos: Vec;
+    cam: Ray;
+    cx: Vec;
+    cy: Vec;
+    spheres: Sphere[];
+    constructor(public width: int = 0, public height: int = 0) {}
+}
+var context: Context;
+
+class Locals {
+    black: Vec = new Vec(0, 0, 0);
+    red: Vec = new Vec(1, 0, 0);
+    hit: Hit = new Hit();
+    _f: Vec = new Vec();
+    loc1: Vec = new Vec();
+    loc2: Vec = new Vec();
+    loc3: Vec = new Vec();
+    loc4: Vec = new Vec();
+    loc5: Vec = new Vec();
+    loc6: Vec = new Vec();
+    loc7: Vec = new Vec();
+    loc8: Vec = new Vec();
+    loc9: Vec = new Vec();
+    loc10: Vec = new Vec();
+    loc11: Vec = new Vec();
+    loc12: Vec = new Vec();
+    loc13: Vec = new Vec();
+    loc14: Vec = new Vec();
+    loc15: Vec = new Vec();
+    loc16: Vec = new Vec();
+    loc17: Vec = new Vec();
+    loc18: Vec = new Vec();
+    loc19: Vec = new Vec();
+    loc20: Vec = new Vec();
+    result: Vec = new Vec();
+    loc_r1: Ray = new Ray();
+    loc_r2: Ray = new Ray();
+
+    constructor() {}
+}
+
+export function getPixels(): Vec[] {
+    return context.pixels;
+}
+
+export function setPixels(p: Vec[]): void {
+    context.pixels = p;
+}
+
+export function setContext(ctx: Context): void {
+    context = ctx;
+}
+
+export function getContext(): Context {
+    return context;
+}
+
+export function createContext(w: int, h: int): Context {
+    context = new Context();
+    context.spheres = [
+        //Scene: radius, position, emission, color, material
+        new Sphere(1e5, new Vec(1e5 + 1, 40.8, 81.6), new Vec(), new Vec(0.75, 0, 0), Refl_t.DIFF), //Left
+        new Sphere(1e5, new Vec(-1e5 + 99, 40.8, 81.6), new Vec(), new Vec(0, 0.75, 0), Refl_t.DIFF), //Rght
+        new Sphere(1e5, new Vec(50, 40.8, 1e5), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Back
+        new Sphere(1e5, new Vec(50, 40.8, -1e5 + 170), new Vec(), new Vec(), Refl_t.DIFF), //Frnt
+        new Sphere(1e5, new Vec(50, 1e5, 81.6), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Botm
+        new Sphere(1e5, new Vec(50, -1e5 + 81.6, 81.6), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Top
+        new Sphere(16.5, new Vec(27, 16.5, 47), new Vec(), new Vec(0.999, 0.999, 0.999), Refl_t.SPEC), //Mirr
+        new Sphere(16.5, new Vec(73, 16.5, 78), new Vec(), new Vec(0.999, 0.999, 0.999), Refl_t.REFR), //Glas
+        new Sphere(600, new Vec(50, 681.6 - 0.27, 81.6), new Vec(112, 112, 112), new Vec(), Refl_t.DIFF), //Lite
+    ];
+    context.dir = new Vec(0, -0.042612, -1);
+    context.pos = new Vec(50, 52, 295.6);
+    context.cam = new Ray(context.pos, context.dir.norm_in()); // cam pos, dir
+    context.cx = new Vec();
+    context.cy = new Vec();
+    context.width = w;
+    context.height = h;
+    context.cx.set((<float>w * 0.5135) / <float>h, 0, 0);
+    context.cx
+        .mod2(context.cam.d, context.cy)
+        .norm_in()
+        .multScalar_in(0.5135);
+    var len = w * h;
+    context.pixels = new Array<Vec>(len);
+    for (let i = 0; i < len; i++) {
+        context.pixels[i] = new Vec();
+    }
+    return context;
+}
+
+export function createLocals(): Locals {
+    var locals = new Locals();
+    return locals;
+}
+
+function radiance(r: Ray, depth: int, f: Vec, locals: Locals): Vec {
+    // return locals.red;
     intersect(r, locals.hit, locals);
-    if (locals.hit.t == 1e20) {
+
+    if (locals.hit.t == Infinity) {
         return locals.black; // if miss, return black
     }
-    // var obj: Sphere = unchecked(context.spheres[locals.hit.id]); // the hit object
-
-    var obj: Sphere = context.spheres[locals.hit.id]; // the hit object
+    // return locals.red.set(locals.hit.t, 0, 0);
+    var obj: Sphere = unchecked(context.spheres[locals.hit.id]); // the hit object
+    // var obj: Sphere = context.spheres[locals.hit.id]; // the hit object
     r.d.multScalar2(locals.hit.t, locals.loc1);
 
     var x: Vec = locals.loc1.add2(r.o, locals.loc2);
@@ -271,7 +365,7 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
 
     var p: float = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y : f.z; // max refl
     // Xi = rand();
-    if (++depth > 4) {
+    if (++depth > 5) {
         if (rand() < p) {
             f.multScalar_in(1 / p);
             f.setFrom(obj.e); //R.R.
@@ -303,7 +397,7 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
             .norm_in();
         let ray = locals.loc_r1.set(x, d);
         let rad = locals.loc7.set(0, 0, 0);
-        radiance(ray, depth, Xi, rad, locals);
+        radiance(ray, depth, rad, locals);
         f.mul_in(rad);
         f.add_in(obj.e);
         return f;
@@ -312,7 +406,7 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
         let d1 = r.d.sub2(n.multScalar_in(2 * n.dot(r.d)), locals.loc18);
         let ray = locals.loc_r1.set(x, d1);
         let rad = locals.loc7.set(0, 0, 0);
-        radiance(ray, depth, Xi, rad, locals);
+        radiance(ray, depth, rad, locals);
         f.mul_in(rad);
         return f.add_in(obj.e);
     }
@@ -330,7 +424,7 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
     if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) < 0) {
         // Total internal reflection
         let rad = locals.loc7.set(0, 0, 0);
-        radiance(reflRay, depth, Xi, rad, locals);
+        radiance(reflRay, depth, rad, locals);
         f.mul_in(rad);
         return f.add_in(obj.e);
     }
@@ -354,13 +448,13 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
     var rad: Vec = locals.loc10.set(0, 0, 0);
     if (depth > 2) {
         if (rand() < P) {
-            radiance(reflRay, depth, Xi, rad, locals).multScalar_in(RP);
+            radiance(reflRay, depth, rad, locals).multScalar_in(RP);
         } else {
-            radiance(ray, depth, Xi, rad, locals).multScalar_in(TP);
+            radiance(ray, depth, rad, locals).multScalar_in(TP);
         }
     } else {
-        radiance(ray, depth, Xi, locals.loc20, locals).multScalar_in(Tr);
-        radiance(reflRay, depth, Xi, rad, locals)
+        radiance(ray, depth, locals.loc20, locals).multScalar_in(Tr);
+        radiance(reflRay, depth, rad, locals)
             .multScalar_in(Re)
             .add_in(locals.loc20);
     }
@@ -368,117 +462,8 @@ function radiance(r: Ray, depth: int, Xi: u16, f: Vec, locals: Locals): Vec {
     return f.add_in(obj.e);
 }
 
-class Context {
-    id: i32 = 0;
-    pixels: Vec[];
-    dir: Vec;
-    pos: Vec;
-    cam: Ray;
-    cx: Vec;
-    cy: Vec;
-    seed: u64;
-    spheres: Sphere[];
-    constructor(public width: int = 0, public height: int = 0) {}
-}
-var context: Context;
-
-class Locals {
-    black: Vec = new Vec(0, 0, 0);
-    red: Vec = new Vec(10, 0, 0);
-    hit: Hit = new Hit();
-    _f: Vec = new Vec();
-    loc1: Vec = new Vec();
-    loc2: Vec = new Vec();
-    loc3: Vec = new Vec();
-    loc4: Vec = new Vec();
-    loc5: Vec = new Vec();
-    loc6: Vec = new Vec();
-    loc7: Vec = new Vec();
-    loc8: Vec = new Vec();
-    loc9: Vec = new Vec();
-    loc10: Vec = new Vec();
-    loc11: Vec = new Vec();
-    loc12: Vec = new Vec();
-    loc13: Vec = new Vec();
-    loc14: Vec = new Vec();
-    loc15: Vec = new Vec();
-    loc16: Vec = new Vec();
-    loc17: Vec = new Vec();
-    loc18: Vec = new Vec();
-    loc19: Vec = new Vec();
-    loc20: Vec = new Vec();
-    result: Vec = new Vec();
-    loc_r1: Ray = new Ray();
-    loc_r2: Ray = new Ray();
-
-    constructor() {}
-}
-
-export function getSpheres(): Sphere[] {
-    return context.spheres;
-}
-
-export function getPixels(): Vec[] {
-    return context.pixels;
-}
-
-export function setPixels(p: Vec[]): void {
-    context.pixels = p;
-}
-
-export function setContext(ctx: Context): void {
-    context = ctx;
-}
-
-export function getContext(): Context {
-    return context;
-}
-
-export function createContext(w: int, h: int): Context {
-    context = new Context();
-    context.spheres = [
-        //Scene: radius, position, emission, color, material
-        new Sphere(1e5, new Vec(1e5 + 1, 40.8, 81.6), new Vec(), new Vec(0.75, 0, 0), Refl_t.DIFF), //Left
-        new Sphere(1e5, new Vec(-1e5 + 99, 40.8, 81.6), new Vec(), new Vec(0, 0.75, 0), Refl_t.DIFF), //Rght
-        new Sphere(1e5, new Vec(50, 40.8, 1e5), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Back
-        new Sphere(1e5, new Vec(50, 40.8, -1e5 + 170), new Vec(), new Vec(), Refl_t.DIFF), //Frnt
-        new Sphere(1e5, new Vec(50, 1e5, 81.6), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Botm
-        new Sphere(1e5, new Vec(50, -1e5 + 81.6, 81.6), new Vec(), new Vec(0.75, 0.75, 0.75), Refl_t.DIFF), //Top
-        new Sphere(16.5, new Vec(27, 16.5, 47), new Vec(), new Vec(0.999, 0.999, 0.999), Refl_t.SPEC), //Mirr
-        new Sphere(16.5, new Vec(73, 16.5, 78), new Vec(), new Vec(0.999, 0.999, 0.999), Refl_t.REFR), //Glas
-        new Sphere(600, new Vec(50, 681.6 - 0.27, 81.6), new Vec(12, 12, 12), new Vec(), Refl_t.DIFF), //Lite
-    ];
-    context.seed = reinterpret<u64>(JSMath.random());
-    NativeMath.seedRandom(context.seed);
-    context.dir = new Vec(0, -0.042612, -1);
-    context.pos = new Vec(50, 52, 295.6);
-    context.cam = new Ray(context.pos, context.dir.norm_in()); // cam pos, dir
-    context.cx = new Vec();
-    context.cy = new Vec();
-    context.width = w;
-    context.height = h;
-    context.cx.set((<float>w * 0.5135) / <float>h, 0, 0);
-    context.cx
-        .mod2(context.cam.d, context.cy)
-        .norm_in()
-        .multScalar_in(0.5135);
-    var len = w * h;
-    context.pixels = new Array<Vec>(len);
-    for (let i = 0; i < len; i++) {
-        context.pixels[i] = new Vec();
-    }
-    return context;
-}
-
-export function createLocals(): Locals {
-    var locals = new Locals();
-    return locals;
-}
-
-export function render(locals: Locals, c: Vec[], samps: int, ox: int, oy: int, w: int, h: int): Vec[] {
+export function render(locals: Locals, samps: int, ox: int, oy: int, w: int, h: int): void {
     // #pragma omp parallel for schedule(dynamic, 1) private(r)       // OpenMP
-    // logi(context.spheres.length);
-    var Xi = <u16>context.seed;
     // Loop over image rows
     for (let y: int = oy; y < oy + h; y++) {
         // fprintf(stderr, "\rRendering (%d spp) %5.2f%%", samps * 4, 100. * y / (h - 1));
@@ -510,7 +495,7 @@ export function render(locals: Locals, c: Vec[], samps: int, ox: int, oy: int, w
                         d3.add_in(context.cam.o);
                         let d4 = d1.norm_in();
                         let _r1 = locals.loc_r2.set(d3, d4);
-                        let _r2 = radiance(_r1, 0, Xi, locals.loc15, locals);
+                        let _r2 = radiance(_r1, 0, locals.loc15, locals);
                         // let _r2 = locals.red;
                         _r2.multScalar_in(1.0 / <float>samps);
                         locals.result.add_in(_r2);
@@ -521,14 +506,13 @@ export function render(locals: Locals, c: Vec[], samps: int, ox: int, oy: int, w
                     let _y = clamp(locals.result.y);
                     let _z = clamp(locals.result.z);
                     let v1 = locals.loc16.set(_x, _y, _z);
-                    v1.multScalar_in(0.5);
+                    v1.multScalar_in(0.55);
+                    // v1.set(0, 1, 0);
 
-                    let _c = c[i];
+                    let _c = context.pixels[i];
                     _c.add_in(v1);
                 }
             }
         }
     }
-
-    return c;
 }

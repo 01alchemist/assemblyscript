@@ -2,7 +2,7 @@ import { AL_MASK, MAX_SIZE_32 } from "../internal/allocator";
 
 var startOffset: usize = (HEAP_BASE + AL_MASK) & ~AL_MASK;
 var offset_ptr: usize = startOffset;
-store<u32>(offset_ptr, startOffset + 4);
+store<u32>(offset_ptr, (HEAP_BASE + 4 + AL_MASK) & ~AL_MASK);
 
 @global
 export function allocator_get_offset(): usize {
@@ -44,5 +44,5 @@ export function free_memory(ptr: usize): void {
 
 @global
 export function reset_memory(): void {
-    offset = startOffset;
+    allocator_set_offset(startOffset);
 }

@@ -80,22 +80,23 @@
       shared: true,
       maximum: 32767
     })
-    const numCPU = 1;//navigator.hardwareConcurrency - 1;
+    const numCPU = navigator.hardwareConcurrency - 1;
     let workers = [];
     let numWorkersInited = 0;
     let numWorkersDone = 0;
+    let numWorkersStarted = 0;
     let workersReady = false;
     let batchDone = false;
     let jobs = [];
     let queue = [];
-    let memoryView;
     var context_ptr;
     var pixels_ptr;
     var iterations = 0;
     let wasmModule;
+    var memoryView = new DataView(memory.buffer);
 
     async function init() {
-      const res = await fetch("build/untouched.wasm");
+      const res = await fetch("build/optimized.wasm");
       const buffer = await res.arrayBuffer();
       wasmModule = await WebAssembly.compile(buffer)
       for (let i = 0; i < numCPU; i++) {
@@ -106,12 +107,14 @@
 
       var col = width / bucketSize;
       var row = height / bucketSize;
-
+      var count = 0
       for (var j = 0; j < row; j++) {
         for (var i = 0; i < col; i++) {
           jobs.push({
             id: j + "_" + i,
-            iterations: 0,
+            iterations: 1,
+            startTime: 0,
+            duration: ++count,
             samples: 4,
             width: bucketSize,
             height: bucketSize,
@@ -136,9 +139,11 @@
         case "inited": {
           if (data.pixels_ptr) {
             pixels_ptr = data.pixels_ptr;
+            console.log('pixels_ptr:' + pixels_ptr)
           }
           if (data.context_ptr) {
             context_ptr = data.context_ptr;
+            console.log('context_ptr:' + context_ptr)
           }
           numWorkersInited++;
           if (numWorkersInited === workers.length) {
@@ -151,10 +156,15 @@
         }
         case "done": {
           numWorkersDone++;
+          let job = jobs.find(job => job.id === data.job.id)
+          if (job) {
+            job.duration = Date.now() - job.startTime;
+          }
           updateFrame(data.job)
-          if (numWorkersDone >= workers.length) {
+          if (numWorkersDone >= numWorkersStarted) {
             batchDone = true;
             numWorkersDone = 0;
+            numWorkersStarted = 0;
             start();
           }
           break;
@@ -166,6 +176,7 @@
       return new Promise(async function (resolve) {
         updateIndicator(job)
         await sleep();
+        job.startTime = Date.now();
         worker.postMessage({ command: 'run', job })
         job.iterations++;
         await sleep();
@@ -174,7 +185,7 @@
     }
 
     async function start() {
-      if (iterations > 1) {
+      if (iterations > 1000) {
         return;
       }
       await render();
@@ -183,7 +194,7 @@
 
     async function sleep() {
       return new Promise(function (resolve) {
-        setTimeout(resolve, 1000)
+        setTimeout(resolve, 10)
       })
     }
 
@@ -191,7 +202,7 @@
       // console.time('rendered in')
 
       if (queue.length == 0) {
-        queue = jobs.concat()
+        queue = jobs.sort((a, b) => a.duration - b.duration).concat()
         iterations++;
       }
       let promises = [];
@@ -199,13 +210,13 @@
         let job = queue.shift();
         if (job) {
           promises.push(run(job, worker));
+          numWorkersStarted++;
         }
       })
       await Promise.all(promises)
     }
 
     function updateFrame(job) {
-      memoryView = new DataView(memory.buffer);
       let pixels = readPixels(pixels_ptr, memoryView);
       // console.timeEnd('rendered in')
       // console.time('write time')

@@ -9,7 +9,7 @@
         "asbuild": "npm run asbuild:untouched && npm run asbuild:optimized && npm run asbuild:asmjs",
         "tsbuild": "tsc -p assembly -t ES2017 -m commonjs --outDir build",
         "build": "npm run asbuild && npm run tsbuild",
-        "watch": "nodemon --exec 'npm run asbuild:untouched' ./assembly/index.ts",
+        "watch": "nodemon --exec 'npm run asbuild:optimized' ./assembly/index.ts",
         "server": "http-server . -o -c-1",
         "test": "node tests"
     },

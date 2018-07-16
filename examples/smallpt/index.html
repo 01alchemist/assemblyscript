@@ -80,39 +80,28 @@
       shared: true,
       maximum: 32767
     })
-    const numCPU = navigator.hardwareConcurrency - 1;
-    let threads = [];
+    const numCPU = 1;//navigator.hardwareConcurrency - 1;
+    let workers = [];
+    let numWorkersInited = 0;
+    let numWorkersDone = 0;
+    let workersReady = false;
+    let batchDone = false;
     let jobs = [];
     let queue = [];
     let memoryView;
-    let _exports = {};
+    var context_ptr;
     var pixels_ptr;
     var iterations = 0;
-    function onTraceJobComplete(job) {
-      console.log('onTraceJobComplete:' + job)
-    }
+    let wasmModule;
 
     async function init() {
       const res = await fetch("build/untouched.wasm");
       const buffer = await res.arrayBuffer();
-
+      wasmModule = await WebAssembly.compile(buffer)
       for (let i = 0; i < numCPU; i++) {
-        const module1 = await WebAssembly.instantiate(buffer, {
-          env: {
-            memory,
-            abort: function () { }
-          },
-          JSMath: Math,
-          index: {
-            id: i + 1,
-            onTraceJobComplete: onTraceJobComplete,
-            logf: f => console.log('float:' + f),
-            logi: i => console.log('int:' + i),
-          }
-        })
-
-        const exp1 = module1.instance.exports;
-        threads.push(exp1)
+        let worker = new Worker("./worker.js")
+        worker.onmessage = onWorkerMessage
+        workers.push(worker);
       }
 
       var col = width / bucketSize;
@@ -132,35 +121,69 @@
           )
         }
       }
-
-      pixels_ptr = threads[0].createPixels(width, height);
+      initWorker(0)
       // requestAnimationFrame(render)
-      start();
     }
 
-    async function run(job, thread) {
+    function initWorker(index, memoryTop) {
+      workers[index].postMessage({ command: 'init', id: index + 1, wasmModule, memory, width, height, memoryTop, context_ptr })
+    }
+
+    function onWorkerMessage(e) {
+      const data = e.data;
+      // console.log(data)
+      switch (data.event) {
+        case "inited": {
+          if (data.pixels_ptr) {
+            pixels_ptr = data.pixels_ptr;
+          }
+          if (data.context_ptr) {
+            context_ptr = data.context_ptr;
+          }
+          numWorkersInited++;
+          if (numWorkersInited === workers.length) {
+            workersReady = true;
+            start();
+          } else {
+            initWorker(numWorkersInited, data.memoryTop)
+          }
+          break;
+        }
+        case "done": {
+          numWorkersDone++;
+          updateFrame(data.job)
+          if (numWorkersDone >= workers.length) {
+            batchDone = true;
+            numWorkersDone = 0;
+            start();
+          }
+          break;
+        }
+      }
+    }
+
+    async function run(job, worker) {
       return new Promise(async function (resolve) {
         updateIndicator(job)
         await sleep();
-        thread.render(pixels_ptr, job.samples, job.xoffset, job.yoffset, job.width, job.height);
+        worker.postMessage({ command: 'run', job })
         job.iterations++;
-        updateFrame(job)
         await sleep();
         resolve()
       })
     }
 
     async function start() {
-      if (iterations > 1000) {
+      if (iterations > 1) {
         return;
       }
       await render();
-      start();
+      // start();
     }
 
     async function sleep() {
       return new Promise(function (resolve) {
-        setTimeout(resolve, 0)
+        setTimeout(resolve, 1000)
       })
     }
 
@@ -172,17 +195,17 @@
         iterations++;
       }
       let promises = [];
-      threads.forEach((thread, i) => {
+      workers.forEach((worker, i) => {
         let job = queue.shift();
         if (job) {
-          promises.push(run(job, thread));
+          promises.push(run(job, worker));
         }
       })
       await Promise.all(promises)
     }
 
     function updateFrame(job) {
-      memoryView = new DataView(threads[0].memory.buffer);
+      memoryView = new DataView(memory.buffer);
       let pixels = readPixels(pixels_ptr, memoryView);
       // console.timeEnd('rendered in')
       // console.time('write time')
@@ -191,10 +214,6 @@
           // let i = (height - y - 1) * width + x
           var i = y * (width * 4) + (x * 4);
           var pi = y * (width * 3) + (x * 3);
-
-          // data[i] = (pixels[pi]) * 255;
-          // data[i + 1] = (pixels[pi + 1]) * 255;
-          // data[i + 2] = (pixels[pi + 2]) * 255;
 
           data[i] = (pixels[pi] / job.iterations) * 255;
           data[i + 1] = (pixels[pi + 1] / job.iterations) * 255;

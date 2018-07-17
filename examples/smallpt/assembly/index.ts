@@ -364,7 +364,6 @@ function radiance(r: Ray, depth: int, f: Vec, locals: Locals): Vec {
     f.setFrom(obj.c);
 
     var p: float = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y : f.z; // max refl
-    // Xi = rand();
     if (++depth > 5) {
         if (rand() < p) {
             f.multScalar_in(1 / p);
@@ -463,7 +462,6 @@ function radiance(r: Ray, depth: int, f: Vec, locals: Locals): Vec {
 }
 
 export function render(locals: Locals, samps: int, ox: int, oy: int, w: int, h: int): void {
-    // #pragma omp parallel for schedule(dynamic, 1) private(r)       // OpenMP
     // Loop over image rows
     for (let y: int = oy; y < oy + h; y++) {
         // fprintf(stderr, "\rRendering (%d spp) %5.2f%%", samps * 4, 100. * y / (h - 1));
@@ -496,7 +494,6 @@ export function render(locals: Locals, samps: int, ox: int, oy: int, w: int, h: 
                         let d4 = d1.norm_in();
                         let _r1 = locals.loc_r2.set(d3, d4);
                         let _r2 = radiance(_r1, 0, locals.loc15, locals);
-                        // let _r2 = locals.red;
                         _r2.multScalar_in(1.0 / <float>samps);
                         locals.result.add_in(_r2);
                     }
@@ -507,7 +504,6 @@ export function render(locals: Locals, samps: int, ox: int, oy: int, w: int, h: 
                     let _z = clamp(locals.result.z);
                     let v1 = locals.loc16.set(_x, _y, _z);
                     v1.multScalar_in(0.55);
-                    // v1.set(0, 1, 0);
 
                     let _c = context.pixels[i];
                     _c.add_in(v1);

@@ -52,7 +52,7 @@ async function onMessageReceived(e) {
             pixels_ptr = wasmExp.getPixels();
             const { job } = data;
             wasmExp.render(locals_ptr, job.samples, job.xoffset, job.yoffset, job.width, job.height);
-            postMessage({ event: "done", job });
+            postMessage({ event: "done", job, id });
             break;
         }
     }

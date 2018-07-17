@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Smallpt - AssemblyScript</title>
+  <title>Path Tracing 3D Rendering - AssemblyScript</title>
   <link rel="icon" href="http://assemblyscript.org/favicon.ico" type="image/x-icon" />
   <meta name="viewport" content="user-scalable=0" />
   <style>
@@ -37,20 +37,39 @@
     }
 
     canvas {
-      position: absolute;
       transform: rotate(180deg);
-      top: 60px;
-      left: 20px;
-      /* width: calc(100% - 40px); */
-      /* height: calc(100% - 80px); */
       background: #070809;
+    }
+
+    #startStopBtn {
+      display: inline-block;
+      padding: 10px;
+      background: #008dff;
+      color: white;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    #stage {
+      position: relative;
+      text-align: center;
+    }
+
+    #profiler {
+      font-family: 'Courier New', Courier, monospace;
+      position: absolute;
+      padding: 10px;
+    }
+
+    .cpu-time {
+      display: inline-block;
     }
   </style>
 </head>
 
 <body>
   <h1>
-    <a href="https://en.wikipedia.org/wiki/Path_tracing">Smallpt</a> in
+    <a href="https://en.wikipedia.org/wiki/Path_tracing">Path Tracing 3D Rendering</a> in
     <a href="http://assemblyscript.org">AssemblyScript</a>
     (
     <a href="https://github.com/AssemblyScript/assemblyscript/blob/master/examples/path-tracer/assembly/index.ts">source</a> )
@@ -58,19 +77,28 @@
       <a href="https://dump.01alchemist.com" target="_blank">By 01 Alchemist</a>
     </div>
   </h1>
-  <div>
+  <div id="profiler">
+    <h4>CPU Profile</h4>
+  </div>
+  <div id="stage">
     <canvas id="viewport"></canvas>
+    <div id="startStopBtn">START</div>
   </div>
   <script>
     "use strict";
     var width = 64 * 10;
-    // var width = 1280/2;
     var height = 64 * 10;
-    // var height = 720/2;
     var bucketSize = 64;
     const canvas = document.getElementById('viewport')
+    const stage = document.getElementById('stage')
+    const startStopBtn = document.getElementById('startStopBtn')
+    const profiler = document.getElementById('profiler')
     canvas.width = width;
     canvas.height = height;
+    stage.style.width = `${width}px`
+    stage.style.height = `${height}px`
+    stage.style.left = `calc((100vw - ${width}px)/2)`
+    stage.style.top = `calc(calc((100vh - ${height}px)/2) - 90px)`
     const ctx = canvas.getContext('2d');
     let imageData = ctx.getImageData(0, 0, width, height)
     let data = imageData.data;
@@ -81,17 +109,20 @@
       maximum: 32767
     })
     const numCPU = navigator.hardwareConcurrency - 1;
+    let profiles = []
     let workers = [];
     let numWorkersInited = 0;
     let numWorkersDone = 0;
     let numWorkersStarted = 0;
     let workersReady = false;
     let batchDone = false;
+    let isTracing = false;
     let jobs = [];
     let queue = [];
     var context_ptr;
     var pixels_ptr;
     var iterations = 0;
+    var maxIterations = 100000;
     let wasmModule;
     var memoryView = new DataView(memory.buffer);
 
@@ -103,6 +134,9 @@
         let worker = new Worker("./worker.js")
         worker.onmessage = onWorkerMessage
         workers.push(worker);
+        let cpuTime = document.createElement('div', { class: "cpu-time" })
+        profiler.appendChild(cpuTime)
+        profiles.push({ el: cpuTime, time: 0 });
       }
 
       var col = width / bucketSize;
@@ -148,7 +182,10 @@
           numWorkersInited++;
           if (numWorkersInited === workers.length) {
             workersReady = true;
-            start();
+            startStopBtn.onclick = toggleTracer
+            if (isTracing) {
+              start();
+            }
           } else {
             initWorker(numWorkersInited, data.memoryTop)
           }
@@ -159,12 +196,22 @@
           let job = jobs.find(job => job.id === data.job.id)
           if (job) {
             job.duration = Date.now() - job.startTime;
+            const index = data.id - 1;
+            if (profiles[index]) {
+              profiles[index].el.innerText = "Thread #" + data.id + " " + job.duration + " ms";
+            } else {
+              console.log(index)
+            }
           }
+
           updateFrame(data.job)
           if (numWorkersDone >= numWorkersStarted) {
             batchDone = true;
             numWorkersDone = 0;
             numWorkersStarted = 0;
+            if (iterations > maxIterations) {
+              return;
+            }
             start();
           }
           break;
@@ -172,7 +219,22 @@
       }
     }
 
+    function toggleTracer() {
+      isTracing = !isTracing;
+      if (isTracing) {
+        startStopBtn.innerText = "STOP"
+        if (workersReady) {
+          start();
+        }
+      } else {
+        startStopBtn.innerText = "START"
+      }
+    }
+
     async function run(job, worker) {
+      if (!isTracing) {
+        return;
+      }
       return new Promise(async function (resolve) {
         updateIndicator(job)
         await sleep();
@@ -185,22 +247,20 @@
     }
 
     async function start() {
-      if (iterations > 1000) {
-        return;
-      }
       await render();
-      // start();
     }
 
     async function sleep() {
       return new Promise(function (resolve) {
-        setTimeout(resolve, 10)
+        setTimeout(resolve, 0)
       })
     }
 
     async function render() {
       // console.time('rendered in')
-
+      if (!isTracing) {
+        return;
+      }
       if (queue.length == 0) {
         queue = jobs.sort((a, b) => a.duration - b.duration).concat()
         iterations++;

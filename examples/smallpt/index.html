@@ -122,7 +122,8 @@
     var context_ptr;
     var pixels_ptr;
     var iterations = 0;
-    var maxIterations = 100000;
+    var maxIterations = 1;
+    let startTime = 0;
     let wasmModule;
     var memoryView = new DataView(memory.buffer);
 
@@ -210,6 +211,8 @@
             numWorkersDone = 0;
             numWorkersStarted = 0;
             if (iterations > maxIterations) {
+              const time = Date.now() - startTime;
+              console.log(`Finished ${Math.round(time / 1000)}`)
               return;
             }
             start();
@@ -224,6 +227,7 @@
       if (isTracing) {
         startStopBtn.innerText = "STOP"
         if (workersReady) {
+          startTime = Date.now();
           start();
         }
       } else {

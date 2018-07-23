@@ -13,5 +13,8 @@
         "server": "http-server . -o -c-1",
         "test": "node tests"
     },
-    "devDependencies": {}
+    "devDependencies": {},
+    "dependencies": {
+        "dotenv": "^6.0.0"
+    }
 }

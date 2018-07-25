@@ -25,7 +25,7 @@
  (import "JSMath" "random" (func $~lib/math/JSMath.random (result f64)))
  (import "JSMath" "cos" (func $~lib/math/JSMath.cos (param f64) (result f64)))
  (import "JSMath" "sin" (func $~lib/math/JSMath.sin (param f64) (result f64)))
- (import "env" "memory" (memory $0 (shared 1 65534)))
+ (import "env" "memory" (memory $0 1))
  (global $~lib/allocator/shared/startOffset (mut i32) (i32.const 0))
  (global $~lib/allocator/shared/offset_ptr (mut i32) (i32.const 0))
  (global $~argc (mut i32) (i32.const 0))

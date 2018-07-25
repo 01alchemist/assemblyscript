@@ -125,12 +125,16 @@
     var maxIterations = 1;
     let startTime = 0;
     let wasmModule;
+    let wasmLibModule;
     var memoryView = new DataView(memory.buffer);
 
     async function init() {
       const res = await fetch("build/optimized.wasm");
+      const libRes = await fetch("lib/lib.wasm");
       const buffer = await res.arrayBuffer();
+      const libBuffer = await libRes.arrayBuffer();
       wasmModule = await WebAssembly.compile(buffer)
+      wasmLibModule = await WebAssembly.compile(libBuffer)
       for (let i = 0; i < numCPU; i++) {
         let worker = new Worker("./worker.js")
         worker.onmessage = onWorkerMessage
@@ -164,7 +168,7 @@
     }
 
     function initWorker(index, memoryTop) {
-      workers[index].postMessage({ command: 'init', id: index + 1, wasmModule, memory, width, height, memoryTop, context_ptr })
+      workers[index].postMessage({ command: 'init', id: index + 1, wasmModule, wasmLibModule, memory, width, height, memoryTop, context_ptr })
     }
 
     function onWorkerMessage(e) {

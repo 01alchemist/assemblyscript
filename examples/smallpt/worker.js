@@ -13,11 +13,18 @@ async function onMessageReceived(e) {
     switch (data.command) {
         case "init": {
             id = data.id;
+            const lib = await WebAssembly.instantiate(data.wasmLibModule, {
+                env: {
+                    __syscall2: Date.now
+                }
+            })
+            console.log(lib)
             const instance = await WebAssembly.instantiate(data.wasmModule, {
                 env: {
                     memory: data.memory,
-                    abort: function() {},
+                    abort: function () { },
                 },
+                lib: lib.exports,
                 JSMath: Math,
                 index: {
                     id: data.id,
@@ -37,12 +44,12 @@ async function onMessageReceived(e) {
             } else {
                 wasmExp.SET_MEMORY_TOP(data.memoryTop);
                 // setTimeout(() => {
-                    context_ptr = data.context_ptr;
-                    wasmExp.setContext(context_ptr);
-                    pixels_ptr = wasmExp.getPixels();
-                    locals_ptr = wasmExp.createLocals();
-                    let memoryTop = wasmExp.GET_MEMORY_TOP();
-                    postMessage({ event: "inited", memoryTop });
+                context_ptr = data.context_ptr;
+                wasmExp.setContext(context_ptr);
+                pixels_ptr = wasmExp.getPixels();
+                locals_ptr = wasmExp.createLocals();
+                let memoryTop = wasmExp.GET_MEMORY_TOP();
+                postMessage({ event: "inited", memoryTop });
                 // }, id * 100);
             }
             // console.log(`-----------------------------------`);

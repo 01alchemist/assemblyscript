@@ -1,39 +1,38 @@
-
 // @ts-nocheck
-
-@inline export const BLOCK_SIZE: u32 = 32 * 1024; // 32kb
-@inline export const LINE_SIZE: u32 = 128; // 128 byte
-
-enum ImmixBlockState {
-  FREE,
-  LOCKED,
-  OCCUPIED,
-  RECYCLABLE,
+export enum BlockState {
+  FREE = 0x00,
+  LOCKED = 0x01,
+  OCCUPIED = 0x02,
+  RECYCLABLE = 0x03
 }
 
-@unmanaged export class ImmixBlock {
-  state: ImmixBlockState;
-  next: ImmixBlock;
-  prev: ImmixBlock;
+@unmanaged
+export class Block {
+  state: BlockState;
+  next: Block;
+  prev: Block;
 
   bytesAvailable: usize;
 }
 
-enum ImmixLineState {
+enum LineState {
   FREE
 }
 
-@unmanaged export class ImmixLine {
-  state: ImmixLineState;
+@unmanaged
+export class Line {
+  state: LineState;
 }
 
-@unmanaged export class ImmixRef {
-  object: ImmixObject;
-  next: ImmixRef;
+@unmanaged
+export class Ref {
+  object: Object;
+  next: Ref;
 }
 
-@unmanaged export class ImmixObject {
+@unmanaged
+export class Object {
   marked: bool;
   size: u32;
-  ref: ImmixRef;
+  ref: Ref;
 }

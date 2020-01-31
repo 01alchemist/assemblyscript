@@ -5,7 +5,7 @@ import { BlockState } from "./block";
 import { LineFlags } from "./line";
 
 type StandardObjectAddress = usize;
-class LineData extends Uint8Array {}
+class LineData extends Uint8Array { }
 
 class BlockHeader {
   /* Chunk description only valid in the first block data of a chunk */
@@ -26,8 +26,8 @@ class BlockHeader {
 }
 
 /**
-	A block data is storing allocated object into lines. It contains a simple metadata in the header for
-	each line (LineFlags).
+  A block data is storing allocated object into lines. It contains a simple
+  metadata in the header for each line (LineFlags).
 	*/
 @unmanaged
 export class BlockData {
@@ -80,8 +80,8 @@ export class BlockData {
   //@inline
   static fromObject(object: StandardObjectAddress): BlockData {
     assert(object != null);
-			assert(object.isStandardObject());
+    assert(object.isStandardObject());
 
-			return (BlockData*)((intptr_t)object & Constants::BlockSizeInBytesInverseMask);
+    return (BlockData *)((intptr_t)object & Constants:: BlockSizeInBytesInverseMask);
   }
 }

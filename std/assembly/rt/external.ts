@@ -1,4 +1,4 @@
-// @ts-ignore: decorator
+/* // @ts-ignore: decorator
 @global
 declare function __alloc(size: usize, id: u32): usize;
 
@@ -28,4 +28,4 @@ declare function __visit(ref: usize, cookie: u32): void;
 
 // @ts-ignore: decorator
 @global
-declare function __collect(): void;
+declare function __collect(): void; */
